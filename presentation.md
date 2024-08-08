@@ -611,7 +611,7 @@ Many other point codes are used in Comp3D, but only \textbf{0} and \textbf{1} ar
 
     mkdir -p MMVII-PhgrProj/Topo/Obs1/
     cp figure.obs MMVII-PhgrProj/Topo/Obs1/
-    MMVII TopoAdj Obs1 Obs1_out InitRTL FinalRTL NbIter=5
+    MMVII TopoAdj Obs1 Obs1_out InitRTL FinalRTL
 
 Fails:
 \begin{scriptsize}
@@ -673,6 +673,60 @@ The code \textbf{8} is not supported in MMVII, we have to replace it with:
 \end{verbatim}
 \end{scriptsize}
 
+### Results {.fragile}
+\begin{scriptsize}
+\begin{verbatim}
+MMVII TopoAdj Obs1 Obs1_out InitRTL FinalRTL NbIter=5 | grep "sigma0"
+Topo sigma0: 6.45514 (533 obs)
+Topo sigma0: 2.1159 (533 obs)
+Topo sigma0: 1.04765 (533 obs)
+Topo sigma0: 1.04765 (533 obs)
+Topo sigma0: 1.04765 (533 obs)
+\end{verbatim}
+\end{scriptsize}
+
+Results from Comp3D:
+
+\begin{scriptsize}
+\begin{verbatim}
+sigma0 initial:               85.5105
+sigma0 final:                  0.8962
+Iterations:                    3
+Sphere radius:           6377652.47 m
+Total observations number:   538
+Active observations number:  536
+Parameters:                  262
+\end{verbatim}
+\end{scriptsize}
+
+### Differences
+
+For this computation, in MMVII:
+
+ * no obs code 8 (#FIX + 5)
+ * no deactivated obs
+ * coordinates constraints are not taken into account for obs number (for now)
+ * approximative sigma0 is computed only on topo obs (no GCP or photo for now)
+ * better initialization!?
+ * ellipsoidal model
+ * refraction coefficient is fixed (for now)
+
+###
+
+Other pros:
+
+ * can be adjusted with photogrammetry
+ * supports unverticalized stations
+ * one station can have angular and cartesian observations
+
+Other cons:
+
+ * lacking many initialization methods
+ * no 1D or 2D points
+ * no points horizontal centering
+ * no height differences
+ * no PPM/target definition
+ * not vertical deflexion
 
 # Example 3
 
