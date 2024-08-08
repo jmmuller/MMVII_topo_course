@@ -934,4 +934,53 @@ Operators (diffangmod)
  * Some initializations
  * new bench
 
+## Resection
+### Resection
+To add resection initialisation, start with an example dataset:
 
+\begin{figure}
+\includegraphics[width=5cm]{img/resection}
+\end{figure}
+
+
+### Resection {.fragile}
+\begin{scriptsize}
+\begin{verbatim}
+* COR
+ 1 A  90 110 100 0.001 0.001 0.001
+ 1 B  90  90 100 0.001 0.001 0.001
+ 1 C 110  90 100 0.001 0.001 0.001
+\end{verbatim}
+\end{scriptsize}
+
+\begin{scriptsize}
+\begin{verbatim}
+* OBS
+ 7  S  A    0 0.001
+ 5  S  B  300 0.001
+ 5  S  C  200 0.001
+ 5  S  D  100 0.001
+
+ 6  S  A  100 0.001
+ 6  S  B  100 0.001
+ 6  S  C  100 0.001
+ 6  S  D  100 0.001
+
+ 3  S  A   14.140 0.001
+ 3  S  B   14.140 0.001
+ 3  S  C   14.140 0.001
+ 3  S  D   14.140 0.001
+\end{verbatim}
+\end{scriptsize}
+
+
+### Resection
+Resection algorithm:
+
+  * find 3 hz obs to an init point from the same vericalized station
+  * make sure the 3 hz obs are different enought
+  * find a zen obs to an init point from a vericalized station
+  * use a complicated formula:
+\url{https://www.aftopo.org/lexique/relevement-sur-trois-points-calcul-dun/}
+(RELÈVEMENT BARYCENTRIQUE)
+  * implement in *MMVII/src/Topo/topoinit.cpp*, call in *cBA_Topo::tryInit()*
