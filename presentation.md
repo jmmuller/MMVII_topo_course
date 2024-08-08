@@ -513,14 +513,168 @@ MMVII automatically creates a new station when a point is used for the first tim
 If we have to make a new set of orientation unknowns because two instruments were set on the same point with different
 orientations, we can:
 
-   * use separated \texttt{OBS} files
-   * add a \texttt{\#} line to separate the measurements sets
-   * use a code \textbf{7} for the first measurement
+   * use separate \texttt{OBS} files
+   * add a \texttt{\#}-line to separate the measurements sets (\texttt{\#NEW} to keep the orientation constraints)
+   * use a code \textbf{7} instead of \textbf{5} for the first measurement
+
+A separate \texttt{OBS} files or a \texttt{\#}-line closes all current stations.
+Code \textbf{7} only closes the previous station on one point. 
+
+
+### Example {.fragile}
+\begin{scriptsize}
+\begin{verbatim}
+5  St1  PtA  100.000  0.001 * creates a station on St1
+5  St1  PtB  110.000  0.001
+
+5  St2  PtA  200.000  0.001 * creates a station on St2
+ 
+7  St1  PtA  150.000  0.001 * closes station on St1, creates new on St1
+5  St1  PtC  210.000  0.001
+
+5  St2  PtE  250.000  0.001 * uses previous station on St2
+\end{verbatim}
+\end{scriptsize}
+But:
+\begin{scriptsize}
+\begin{verbatim}
+5  St1  PtA  100.000  0.001 * creates a station on St1
+5  St1  PtB  110.000  0.001
+
+5  St2  PtA  200.000  0.001 * creates a station on St2
+
+#NEW                        * closes all the stations
+5  St1  PtA  150.000  0.001 * creates a station on St1
+5  St1  PtC  210.000  0.001
+
+5  St2  PtE  250.000  0.001 * creates a station on St2
+\end{verbatim}
+\end{scriptsize}
+
+### Special case for distance-only
 
 If a station only has distances measurements, it is automatically set as a \texttt{\#FIX} station, since this station orientation unknowns can't be estimated.
 
 
 # Example 2
+
+### Comp3D to MMVII
+
+*Comp3DFigureNoInit* dataset: a regular Comp3D computation project.
+
+7 verticalized stations, measuring 78 targets on the ground and aiming at each other.
+\begin{figure}[!h]
+\centering
+\includegraphics[width=11cm]{img/figure}
+\end{figure}
+
+### Computation frame {.fragile}
+
+There is no geolocalization, but approximative latitude is 44.40\textdegree (for ellipsoid curvature).
+
+\textbf{COR} file :
+\begin{scriptsize}
+\begin{verbatim}
+1  HLLST0001    100.00000 100.00000 10.00000  0.00100 0.00100 0.00100
+\end{verbatim}
+\end{scriptsize}
+
+Only one point, with constraints on its 3 coordinates (code \textbf{1}) is given
+(arbitrary coordinates).
+Comp3D auto-initialization methods computes the initial coordinates of all points,
+from \textbf{HLLST0001} and one azimuth (in the \textbf{OBS} file).
+
+### Computation frame {.fragile}
+
+In Comp3D, the computation frame is spherical, with a radius of the total curvature of the ellipsoid at the given latitude.
+
+MMVII works in a RTL frame uses an ellipsoid for vertical modelization.
+
+Thus the results will be different.
+
+RTL frame definition for a frame at latitude 44.40\textdegree:
+
+    RTL*0*44.40*0*EPSG:4326
+
+### Import COR
+
+To import a Comp3D \textbf{COR} file using only codes \textbf{0} and \textbf{1}:
+
+    MMVII ImportGCP figure.cor ANXYZ InitRTL \
+          ChSys=["RTL*0*44.40*0*EPSG:4326"] \
+          AddInfoFree=0 Sigma=0.001 Comment=*
+
+Sigma can't be read with \textbf{ImportGCP}.
+Many other point codes are used in Comp3D, but only \textbf{0} and \textbf{1} are supported in MMVII.
+
+### Adjustment {.fragile}
+
+    mkdir -p MMVII-PhgrProj/Topo/Obs1/
+    cp figure.obs MMVII-PhgrProj/Topo/Obs1/
+    MMVII TopoAdj Obs1 Obs1_out InitRTL FinalRTL NbIter=5
+
+Fails:
+\begin{scriptsize}
+\begin{verbatim}
+Reading obs file "./MMVII-PhgrProj/Topo/Obs1/figure.obs"...
+Error reading ./MMVII-PhgrProj/Topo/Obs1/figure.obs at line 1:
+      "8 HLLST0001  HLLPI0005  100 0.001 0 0 0"
+skip: "6 HLLST0001 HLLPI0083   105.2274  -0.0008 "  (sigma<0)
+skip: "6 HLLST0005 HLLPI0451   103.7675  -0.0008 "  (sigma<0)
+Reading file finished, added 532 obs.
+MESIM=85 MesGCP=85
+-------- Iter 0-----------
+ ######################################
+Level=[UserEr:UnClassedError]
+Mes=[Error: Initialization has failed for points: HLLPI0005 HLLPI0012
+HLLPI0015 HLLPI0022 HLLPI0024 HLLPI0027 HLLPI0033 HLLPI0034 HLLPI0039
+HLLPI0040 HLLPI0047 HLLPI0053 HLLPI0056 HLLPI0058 HLLPI0064 HLLPI0065
+... HLLST0003 HLLST0004 HLLST0005 HLLST0006 HLLST0007 ]
+\end{verbatim}
+\end{scriptsize}
+
+### Obs file {.fragile}
+
+The \textbf{OBS} file starts with:
+
+\begin{scriptsize}
+\begin{verbatim}
+8 HLLST0001  HLLPI0005  100 0.001 0 0 0 **un faux gisement
+ * mais qui part bien du point HLLST0001 (seul dans le .cor)
+
+*Données réduites
+
+*Tours d'horizon
+*Station n°1 HLLST0001 Temperature = 290 Pression = 7609
+7 HLLST0001 HLLPI0005     0.0000  0.0008  0.0000 0.0000 0.0000
+5 HLLST0001 HLLPI0012   388.7158  0.0008  0.0000 0.0000 0.0000
+5 HLLST0001 HLLPI0015   383.9676  0.0008  0.0000 0.0000 0.0000
+5 HLLST0001 HLLPI0022   372.7380  0.0008  0.0000 0.0000 0.0000       
+\end{verbatim}
+\end{scriptsize}
+
+The code \textbf{8} is an azimuth constraint, saying that HLLPI0005 is in east direction from HLLST0001. It fixes the orientation ambiguity of the system and kickstarts the initial coordinates estimation, by starting on the only known point.
+
+### Obs file {.fragile}
+The code \textbf{8} is not supported in MMVII, we have to replace it with:
+\begin{scriptsize}
+\begin{verbatim}
+#FIX
+5 HLLST0001  HLLPI0005  100 0.001   * hz orientation
+#VERT    * next stations have unknown G_0
+*Données réduites
+
+*Tours d'horizon
+*Station n°1 HLLST0001 Temperature = 290 Pression = 7609
+7 HLLST0001 HLLPI0005     0.0000  0.0008  0.0000 0.0000 0.0000
+5 HLLST0001 HLLPI0012   388.7158  0.0008  0.0000 0.0000 0.0000  
+5 HLLST0001 HLLPI0015   383.9676  0.0008  0.0000 0.0000 0.0000
+5 HLLST0001 HLLPI0022   372.7380  0.0008  0.0000 0.0000 0.0000       
+\end{verbatim}
+\end{scriptsize}
+
+
+# Example 3
 
 ## Principle
 ### Principle
@@ -717,11 +871,13 @@ Operators (diffangmod)
 
 
 # Direct Dev
+###
 
-## Code 8
-
-## Code 4
-
-## Some initializations
+ * Code 8
+ * Code 4
+ * unknown refraction
+ * #CAM
+ * Some initializations
+ * new bench
 
 
