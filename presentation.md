@@ -14,7 +14,6 @@ In its global compensation stage, **MMVII** can handle:
   * ground control points (GCP)
   * distortion models
   * rigid cameras blocks
-  * GNSS cameras positions (soon ?)
   * clinometers (soon ?)
   * and topometric survey measurements!
 
@@ -137,10 +136,19 @@ Example of command line with mandatory and optional parameters:
 
 \begin{scriptsize}
 \begin{verbatim}
-MMVII ImportGCP  2023-10-06_15h31PolarModule.coo  NXYZ Std  \
-                 NumL0=14 NumLast=34  PatName="P\.(.*)" NbDigName=4
+MMVII ImportGCP  2023-10-06_15h31PolarModule.coo NXYZ Std NumL0=14 \
+                 NumLast=34  PatName="P\.(.*)" NbDigName=4
 \end{verbatim}
 \end{scriptsize}
+
+The command to test MMVII:
+
+\begin{scriptsize}
+\begin{verbatim}
+MMVII Bench 1
+\end{verbatim}
+\end{scriptsize}
+
 
 ## MMVII Projects
 
@@ -155,24 +163,24 @@ The file structure is as follows:
 ###
 
 ~~~~~~~
- 
-|-- *.JPG                     <-- image files
-|-- MMVII-LogFile.txt
-+-- MMVII-PhgrProj/
-    +-- InitialOrientations
-    +-- MetaData              <-- metadata rules
-    |   +-- Std
-    +-- Ori                   <-- calib and img ori
-    |   +-- InitL93
-    |   +-- InitRTL
-    |   +-- FinalRTL
-    +-- PointsMeasure         <-- 3d and 2d coords
-    |   +-- InitL93
-    |   +-- InitRTL
-    +-- Reports
-    +-- RigBlock
-    +-- SysCo
-    +-- Topo
+Project Root
+    |-- *.JPG                   <-- image files
+    |-- MMVII-LogFile.txt
+    +-- MMVII-PhgrProj/
+        +-- InitialOrientations
+        +-- MetaData            <-- metadata rules
+        |   +-- Std
+        +-- Ori                 <-- calib and img ori
+        |   +-- InitL93
+        |   +-- InitRTL
+        |   +-- FinalRTL
+        +-- PointsMeasure       <-- 3d and 2d coords
+        |   +-- InitL93
+        |   +-- InitRTL
+        +-- Reports
+        +-- RigBlock
+        +-- SysCo
+        +-- Topo
 ~~~~~~~
 
 ###
@@ -194,7 +202,7 @@ Coordinate systems (SysCo) types supported by MMVII are:
  * **Local**: any Euclidian frame, without any geolocalization or vertical direction knowledge
  * **GeoC**: geocentric coordinates
  * **RTL**: a local Euclidian frame defined by an origin point where Z is normal to ellipsoid
-and X is on East direction
+and X is on east direction
  * **Proj**: any georeferenced system supported by the PROJ library
 
 When SysCo is known, its definition is recorded into the file CurSysCo.xml, in Ori and PointsMeasure directories.
@@ -203,7 +211,7 @@ When SysCo is known, its definition is recorded into the file CurSysCo.xml, in O
 ### SysCo definition
 The SysCo definitions for MMVII commands can be:
 
-* the name of a file in MMVII source subfolder *MMVII/MMVII-RessourceDir/SysCo* or in project subfolder *MMVII-PhgrProj/SysCo*, without its extension (e.g., *L93*)
+* the name of a file in MMVII source subfolder *MMVII/MMVII-RessourceDir/SysCo/* or in project subfolder *MMVII-PhgrProj/SysCo/*, without its extension (e.g., *L93*)
 * any PROJ definition (e.g., *EPSG:4326*)
 * any string starting with **Local** for a local frame (e.g., LocalAMRules)
 * **GeoC** for a geocentric frame
@@ -230,13 +238,13 @@ C.F doc chapter 21.
 
 # Topo
 
-C.F doc chapter 22.
-
 ## Principles
 
 ### Station
 
-Topo measurements are made from an instrument that is verticalized/plumb or not.
+For now, only station-based topo measurements are available.
+
+These measurements are made from an instrument that is verticalized/plumb or not.
 The position and orientation of an instrument define a \textit{station}.
 All the measurements are attached to a station and are expressed in the station frame.
 
@@ -253,7 +261,7 @@ The following measurements types are currently supported:
   * distances
   * horizontal angles
   * zenithal angles
-  * direct Euclidian vector observation
+  * direct Euclidian vectors
 
 The measurements can be made between cameras poses, GCPs or undeclared points that will be inserted into the last GCP set of the adjustment.
 
@@ -264,7 +272,7 @@ The measurements can be made between cameras poses, GCPs or undeclared points th
 Two MMVII commands can use topo measurements in compensation:
 
  * *OriBundleAdj* via the *TopoFile* option
- * *TopoAdj*: when there is no photo
+ * *TopoAdj*: when there is no photogrammetry
 
 
 The topo measurements files can be given as a set of MMVII json or xml files, or in a simplified text format (named *OBS* file) inherited from IGN's
@@ -308,6 +316,8 @@ The observations codes are:
   *  *15*: local $\Delta$y
   *  *16*: local $\Delta$z
 
+C.F doc chapter 22.
+
 # Example 1
 
 ###
@@ -344,23 +354,38 @@ known points is 0.001m and that lines starting with '*' are comment lines.
     MMVII ImportGCP inputs/coords.txt ANXYZ InitL93 \
       ChSys=[L93] AddInfoFree=0 Sigma=0.001 Comment=*
 
+###
 
 In the resulting file *MMVII-PhgrProj/PointsMeasure/InitL93/MesGCP-coords.xml*,
-the points PtA and PtD have a set *\_\_Opt\_\_Sigma2* equivalent to $\sigma = 0.001 m$,
+the points PtA and PtD have an attribute *\_\_Opt\_\_Sigma2* equivalent to $\sigma = 0.001 m$,
 the points PtB and PtC have no *\_\_Opt\_\_Sigma2*, making them free points.
+
+The file *MMVII-PhgrProj/PointsMeasure/InitL93/CurSysCo.xml*, records the SysCo of *InitL93*.
+
 
 ### SysCo
 A *RTL* SysCo is mandatory to be able to compute a topo compensation.
 PtA is chosen as RTL origin (tangency point).
-The SysCo definition is:
+
+What is the SysCo definition?
+
+What is the *GCPChSysCo* command to make the conversion?
+
+***
+
+SysCo definition:
 
     RTL*657700*6860700*0*IGNF:LAMB93
 
-The *GCPChSysCo* command does the conversion to *RTL*:
+\pause
+
+*GCPChSysCo* command:
 
 
     MMVII GCPChSysCo "RTL*657700*6860700*0*IGNF:LAMB93" \
       InitL93 InitRTL
+
+The file *MMVII-PhgrProj/PointsMeasure/InitRTL/CurSysCo.xml*, records the SysCo of *InitRTL*.
 
 ### Measurements {.fragile}
 
@@ -368,7 +393,7 @@ The *GCPChSysCo* command does the conversion to *RTL*:
  * an instrument on PtD make the same to PtB and PtC
 
 
-The corresponding *OBS* file (*inputs/meas.obs}* is:
+The corresponding *OBS* file (*inputs/meas.obs)* is:
 
 \begin{scriptsize}
 \begin{verbatim}
@@ -398,9 +423,13 @@ This file has to be copied into a subdirectory of *MMVII-PhgrProj/Topo*:
 
 ### Unknowns count
 
+\pause
+
 Two verticalized stations, one with its origin on PtA, the other on PtD.
 Each has an horizontal orientation unknown ($G_0$) due to the random orientation of the instrument
 when it has been set.
+
+\pause
 
 The number of unknowns in this configuration is:
 
@@ -412,6 +441,7 @@ The number of constraints is:
  * 3 per constrained point, PtA and PtD  $\rightarrow$ 6 constraints
  * 1 per topo measurement $\rightarrow$ 12 constraints
 
+\pause
 
 Total: 14 unknowns, 18 constraints.
 
@@ -420,7 +450,7 @@ Total: 14 unknowns, 18 constraints.
 ### Adjustment {.fragile}
 
 The *TopoAdj* command can perform an adjustment between topo and GCP constraints.
-It is used as a substitute to *OriBundleAdj* when there are no cameras.
+It is used as a substitute to *OriBundleAdj* when there is no photogrammetry.
 
 \begin{scriptsize}
 \begin{verbatim}
@@ -437,10 +467,11 @@ It is used as a substitute to *OriBundleAdj* when there are no cameras.
   * [Name=GCPFilter] string :: Pattern to filter GCP by name
   * [Name=GCPFilterAdd] string :: Pattern to filter GCP by additional info
   * [Name=GCPDirOut] string [PointsMeasure,Out] :: Dir for output GCP
-  * [Name=LVM] double :: Levenberg–Marquardt parameter (to have better conditioning
-                         of least squares) ,[Default=0]
+  * [Name=LVM] double :: Levenberg–Marquardt parameter (to have better conditioning of least squares) ,[Default=0]
 \end{verbatim}
 \end{scriptsize}
+
+Command line ?
 
 ###
 
@@ -461,9 +492,11 @@ stations orientations...). It can be used as topo input file.
 
 The last step is to convert the RTL coordinates to Lambert 93:
 
+\pause
+
     MMVII GCPChSysCo L93 FinalRTL FinalL93
 
-# Stations
+# Orientations
 
 ### Stations orientation constraints
 
@@ -535,6 +568,9 @@ Code \textbf{7} only closes the previous station on one point.
 5  St2  PtE  250.000  0.001 * uses previous station on St2
 \end{verbatim}
 \end{scriptsize}
+
+\pause
+
 But:
 \begin{scriptsize}
 \begin{verbatim}
@@ -594,11 +630,15 @@ Thus the results will be different.
 
 RTL frame definition for a frame at latitude 44.40\textdegree:
 
+\pause
+
     RTL*0*44.40*0*EPSG:4326
 
 ### Import COR
 
 To import a Comp3D \textbf{COR} file using only codes \textbf{0} and \textbf{1}:
+
+\pause
 
     MMVII ImportGCP figure.cor ANXYZ InitRTL \
           ChSys=["RTL*0*44.40*0*EPSG:4326"] \
@@ -609,27 +649,26 @@ Many other point codes are used in Comp3D, but only \textbf{0} and \textbf{1} ar
 
 ### Adjustment {.fragile}
 
+\pause
+
     mkdir -p MMVII-PhgrProj/Topo/Obs1/
     cp figure.obs MMVII-PhgrProj/Topo/Obs1/
     MMVII TopoAdj Obs1 Obs1_out InitRTL FinalRTL
 
-Fails:
+\pause
+
+Fails: !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
 \begin{scriptsize}
 \begin{verbatim}
-Reading obs file "./MMVII-PhgrProj/Topo/Obs1/figure.obs"...
-Error reading ./MMVII-PhgrProj/Topo/Obs1/figure.obs at line 1:
-      "8 HLLST0001  HLLPI0005  100 0.001 0 0 0"
-skip: "6 HLLST0001 HLLPI0083   105.2274  -0.0008 "  (sigma<0)
-skip: "6 HLLST0005 HLLPI0451   103.7675  -0.0008 "  (sigma<0)
-Reading file finished, added 532 obs.
-MESIM=85 MesGCP=85
--------- Iter 0-----------
+Reading obs file "./MMVII-PhgrProj/Topo/Obs1/meas.obs"...
  ######################################
-Level=[UserEr:UnClassedError]
-Mes=[Error: Initialization has failed for points: HLLPI0005 HLLPI0012
-HLLPI0015 HLLPI0022 HLLPI0024 HLLPI0027 HLLPI0033 HLLPI0034 HLLPI0039
-HLLPI0040 HLLPI0047 HLLPI0053 HLLPI0056 HLLPI0058 HLLPI0064 HLLPI0065
-... HLLST0003 HLLST0004 HLLST0005 HLLST0006 HLLST0007 ]
+Level=[Internal Error]
+Mes=[Error reading ./MMVII-PhgrProj/Topo/Obs1/meas.obs at line 8: "8 a b 4 5"]
+at line  217 of file /home/roa/micmac/MMVII/src/Topo/ctopodata.cpp
+========= ARGS OF COMMAND ==========
+MMVII TopoAdj Obs1 Obs1_out InitRTL FinalRTL 
+Aborted (core dumped)
+
 \end{verbatim}
 \end{scriptsize}
 
@@ -657,6 +696,9 @@ The code \textbf{8} is an azimuth constraint, saying that HLLPI0005 is in east d
 
 ### Obs file {.fragile}
 The code \textbf{8} is not supported in MMVII, we have to replace it with:
+
+\pause
+
 \begin{scriptsize}
 \begin{verbatim}
 #FIX
@@ -912,6 +954,33 @@ or:
        PPFzCal=".*" PatFzCenters=".*" PatFzOrient=".*" \
        TopoDirOut=BlocCarOut GCPDirOut=CarOut NbIter=20
 
+
+# TODO
+
+### Missing features
+
+Vertical:
+
+ - stations and targets heights
+ - height differences
+ - horizontal centering
+ - 2D and 1D points ?
+ 
+### Missing features
+
+Statistics:
+
+ - residuals for every constraint
+ - correct $\sigma_0$
+ - parameters confidence estimation
+
+Misc:
+
+ - refraction parameter
+ - relative sigmas
+ - ...
+
+
 # Implementation
 
 ###
@@ -927,12 +996,12 @@ Operators (diffangmod)
 # Direct Dev
 ###
 
- * Code 8
+ * refraction parameter
+ * Some initializations
+ * new bench
  * Code 4
  * unknown refraction
  * #CAM
- * Some initializations
- * new bench
 
 ## Resection
 ### Resection
