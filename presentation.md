@@ -657,18 +657,14 @@ Many other point codes are used in Comp3D, but only \textbf{0} and \textbf{1} ar
 
 \pause
 
-Fails: !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
+Fails:
 \begin{scriptsize}
 \begin{verbatim}
-Reading obs file "./MMVII-PhgrProj/Topo/Obs1/meas.obs"...
+Reading obs file "./MMVII-PhgrProj/Topo/Obs1/obs.obs"...
  ######################################
 Level=[Internal Error]
-Mes=[Error reading ./MMVII-PhgrProj/Topo/Obs1/meas.obs at line 8: "8 a b 4 5"]
-at line  217 of file /home/roa/micmac/MMVII/src/Topo/ctopodata.cpp
-========= ARGS OF COMMAND ==========
-MMVII TopoAdj Obs1 Obs1_out InitRTL FinalRTL 
-Aborted (core dumped)
-
+Mes=[Error reading ./MMVII-PhgrProj/Topo/Obs1/obs.obs at line 1:
+    "8 HLLST0001  HLLPI0005  100 0.001 0 0 0"]
 \end{verbatim}
 \end{scriptsize}
 
@@ -692,7 +688,7 @@ The \textbf{OBS} file starts with:
 \end{verbatim}
 \end{scriptsize}
 
-The code \textbf{8} is an azimuth constraint, saying that HLLPI0005 is in east direction from HLLST0001. It fixes the orientation ambiguity of the system and kickstarts the initial coordinates estimation, by starting on the only known point.
+The code \textbf{8} is an azimuth constraint, saying that HLLPI0005 is in east direction from HLLST0001. It fixes the orientation ambiguity of the system and kickstarts the initial coordinates estimation.
 
 ### Obs file {.fragile}
 The code \textbf{8} is not supported in MMVII, we have to replace it with:
@@ -746,8 +742,8 @@ Parameters:                  262
 For this computation, in MMVII:
 
  * no obs code 8 (#FIX + 5)
- * no deactivated obs
- * coordinates constraints are not taken into account for obs number (for now)
+ * no deactivated obs (skips obs with sigma<0)
+ * coordinates constraints are not taken into account in statistics (for now)
  * approximative sigma0 is computed only on topo obs (no GCP or photo for now)
  * better initialization!?
  * ellipsoidal model
@@ -791,7 +787,7 @@ There are several fixed ground points used to impose an orientation to the camer
 
 \begin{figure}[!h]
 \centering
-\includegraphics[width=8cm]{img/ex2_map.jpg}
+\includegraphics[width=7.5cm]{img/ex2_map.jpg}
 \end{figure}
 
 
@@ -821,10 +817,15 @@ To get the cameras orientation:
 
 ### Ground targets
 
-    # get 3d coords for ground targets, convert to a RTL
+Get 3d coords for ground targets, convert to RTL:
+
+\pause
+    
     MMVII ImportGCP inputs/coord_gnd.cor SNXYZ GND \
        ChSys=[L93,'RTL*644000*6836370*0*IGNF:LAMB93'] \
        Sigma=0.001
+
+### Ground targets
 
     # make SysCo shortcut 'RTL'
     cp MMVII-PhgrProj/PointsMeasure/GND/CurSysCo.xml \
@@ -978,18 +979,217 @@ Misc:
 
  - refraction parameter
  - relative sigmas
- - ...
 
+### Missing features
+
+New measurement types:
+
+ - unknown sub-frame
+ - rotation axis
+ - distances equalities
+ - barycenters
 
 # Implementation
 
+### Details
+
+See documentation chapter 12
+
+and presentatio on the wiki:
+
+\url{https://github.com/micmacIGN/micmac/files/14614598/SerialDeriv.pdf}
+
+
+## Automatic derivation
+### Automatic derivation
+
+MMVII has its own automatic derivation system,
+based on c++ templates and compilator interpretation of source code.
+
+Steps:
+
+ * write a formula in c++
+ * register this formula in MMVII source
+ * run
+ 
+     MMVII GenCodeSymDer
+ * or simply
+ 
+     make full
+     
+ * use this formula and its derivative in MMVII source
+
+
+### {.fragile}
+MMVII/src/SymbDerGen/Formulas_Geom3D.h
+\begin{scriptsize}
+\begin{verbatim}
+class cDist3D
+{
+  public :
+    cDist3D() {}
+    static const std::vector<std::string> VNamesUnknowns() {
+        return Append(NamesP3("p1"), NamesP3("p2"));
+    }
+    static const std::vector<std::string> VNamesObs() { return {"D"}; }
+    std::string FormulaName() const { return "Dist3D"; }
+    
+    template <typename tUk,typename tObs>
+             static std::vector<tUk> formula
+                  (   const std::vector<tUk> & aVUk,
+                      const std::vector<tObs> & aVObs  )
+    {
+          typedef cPtxd<tUk,3> tPt;
+          tPt p1 = VtoP3(aVUk,0);
+          tPt p2 = VtoP3(aVUk,3);
+          tPt v  = p1-p2;
+          const tUk & ObsDist  = aVObs[0];
+          return {  Norm2(v) - ObsDist } ;
+     }
+};
+\end{verbatim}
+\end{scriptsize}
+
+
+### {.fragile}
+
+MMVII/src/SymbDerGen/GenerateCodes.cpp
+
+\begin{scriptsize}
+\begin{verbatim}
+// dist3d
+template <class Type>
+cCalculator<Type> * TplEqDist3D(bool WithDerive,int aSzBuf)
+{
+  return StdAllocCalc(NameFormula(cDist3D(),WithDerive),aSzBuf);
+}
+
+cCalculator<double> * EqDist3D(bool WithDerive,int aSzBuf)
+{
+  return TplEqDist3D<double>(WithDerive,aSzBuf);
+}
+
+...
+
+int cAppliGenCode::Exe()
+{
+ ...
+ for (const auto WithDer : {true,false})
+ {
+   ...
+   GenCodesFormula((tREAL8*)nullptr,cNetWConsDistSetPts(3,true),WithDer);
+   GenCodesFormula((tREAL8*)nullptr,cDist3D(),WithDer);
+\end{verbatim}
+\end{scriptsize}
+
+### {.fragile}
+
+MMVII/src/GeneratedCodes/CodeGen_cDist3DVal.cpp
+
+\begin{scriptsize}
+\begin{verbatim}
+  for (size_t aK=0; aK < this->mNbInBuf; aK++) {
+// Declare local vars in loop to make them per thread
+    double &p1_x = this->mVUk[aK][0];
+    double &p1_y = this->mVUk[aK][1];
+    double &p1_z = this->mVUk[aK][2];
+    double &p2_x = this->mVUk[aK][3];
+    double &p2_y = this->mVUk[aK][4];
+    double &p2_z = this->mVUk[aK][5];
+    double &D = this->mVObs[aK][0];
+    double F11_ = (p1_y - p2_y);
+    double F10_ = (p1_z - p2_z);
+    double F12_ = (p1_x - p2_x);
+    double F14_ = (F11_ * F11_);
+    double F13_ = (F10_ * F10_);
+    double F15_ = (F12_ * F12_);
+    double F16_ = (F14_ + F15_);
+    double F17_ = (F13_ + F16_);
+    double F18_ = std::sqrt(F17_);
+    double F19_ = (F18_ - D);
+    this->mBufLineRes[aK][0] = F19_;
+  }
+\end{verbatim}
+\end{scriptsize}
+
+
+### {.fragile}
+MMVII/src/GeneratedCodes/CodeGen_cDist3DVDer.cpp
+\begin{columns}[T]
+\begin{column}{0.55\textwidth}
+\begin{scriptsize}
+\begin{verbatim}
+  for (size_t aK=0; aK < this->mNbInBuf; aK++) {
+    double &p1_x = this->mVUk[aK][0];
+    double &p1_y = this->mVUk[aK][1];
+    double &p1_z = this->mVUk[aK][2];
+    double &p2_x = this->mVUk[aK][3];
+    double &p2_y = this->mVUk[aK][4];
+    double &p2_z = this->mVUk[aK][5];
+    double &D = this->mVObs[aK][0];
+    double F12_ = (p1_x - p2_x);
+    double F31_ = (p2_x - p1_x);
+    double F35_ = (p2_y - p1_y);
+    double F39_ = (p2_z - p1_z);
+    double F11_ = (p1_y - p2_y);
+    double F10_ = (p1_z - p2_z);
+    double F36_ = (F35_ + F35_);
+    double F21_ = (F12_ + F12_);
+    double F32_ = (F31_ + F31_);
+    double F27_ = (F10_ + F10_);
+    double F40_ = (F39_ + F39_);
+    double F24_ = (F11_ + F11_);
+    double F15_ = (F12_ * F12_);
+\end{verbatim}
+\end{scriptsize}
+\end{column}
+\begin{column}{0.55\textwidth}
+\begin{scriptsize}
+\begin{verbatim}
+
+
+
+    double F14_ = (F11_ * F11_);
+    double F13_ = (F10_ * F10_);
+    double F16_ = (F14_ + F15_);
+    double F17_ = (F13_ + F16_);
+    double F18_ = std::sqrt(F17_);
+    double F20_ = (2 * F18_);
+    double F19_ = (F18_ - D);
+    double F22_ = (F21_ / F20_);
+    double F25_ = (F24_ / F20_);
+    double F28_ = (F27_ / F20_);
+    double F33_ = (F32_ / F20_);
+    double F37_ = (F36_ / F20_);
+    double F41_ = (F40_ / F20_);
+    this->mBufLineRes[aK][0] = F19_;
+    this->mBufLineRes[aK][1] = F22_;
+    this->mBufLineRes[aK][2] = F25_;
+    this->mBufLineRes[aK][3] = F28_;
+    this->mBufLineRes[aK][4] = F33_;
+    this->mBufLineRes[aK][5] = F37_;
+    this->mBufLineRes[aK][6] = F41_;
+  }
+\end{verbatim}
+\end{scriptsize}
+
+\end{column}
+\end{columns}
+
+
 ###
-
-Doc 12.8
-
-Formulas
 Operators (diffangmod)
 
+## Least squares
+### Least squares
+
+12.3 Non linear system
+
+unknowns 12.6
+
+## Topo
+###
+Doc 12.8
 
 
 
@@ -1002,6 +1202,10 @@ Operators (diffangmod)
  * Code 4
  * unknown refraction
  * #CAM
+
+## Refraction parameter
+### Refraction parameter
+
 
 ## Resection
 ### Resection
@@ -1053,3 +1257,9 @@ Resection algorithm:
 \url{https://www.aftopo.org/lexique/relevement-sur-trois-points-calcul-dun/}
 (RELÈVEMENT BARYCENTRIQUE)
   * implement in *MMVII/src/Topo/topoinit.cpp*, call in *cBA_Topo::tryInit()*
+
+# Links
+### Links
+
+ * https://github.com/micmacIGN/micmac/wiki/MMVII-prog-session-2024-03-Satellite-Bundle-Adjustment
+  
