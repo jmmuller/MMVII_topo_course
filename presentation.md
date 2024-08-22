@@ -955,6 +955,15 @@ or:
        PPFzCal=".*" PatFzCenters=".*" PatFzOrient=".*" \
        TopoDirOut=BlocCarOut GCPDirOut=CarOut NbIter=20
 
+# Example 4
+
+### Polygon
+
+\begin{figure}[!h]
+\centering
+\includegraphics[width=5.5cm]{img/polygon}
+\includegraphics[width=5.5cm]{img/polygon_comp}
+\end{figure}
 
 # TODO
 
@@ -995,7 +1004,7 @@ New measurement types:
 
 See documentation chapter 12
 
-and presentatio on the wiki:
+and presentation on the wiki:
 
 \url{https://github.com/micmacIGN/micmac/files/14614598/SerialDeriv.pdf}
 
@@ -1176,6 +1185,53 @@ MMVII/src/GeneratedCodes/CodeGen_cDist3DVDer.cpp
 \end{column}
 \end{columns}
 
+
+## Topo formulas
+### Topo formulas
+
+
+All the measurements are expressed in the local survey station frame.
+
+The input data are:
+
+ \begin{itemize}
+    \item $O_{RTL}$: station origin point in RTL SysCo
+    \item $T_{RTL}$: target point in RTL SysCo
+    \item $R_{St, RTL}$: rotation from station frame to RTL
+    \item $\omega_R$: the rotation axiator unknown
+    \item $l$: the measurement value
+ \end{itemize}
+ 
+### Topo formulas
+ At first we compute target coordinates in station local frame $T_{loc}$:
+
+ $$  T_{loc} = R_{Station, RTL}^T . (T_{RTL} - O_{RTL})  $$
+ 
+### Topo formulas
+ Then for each type of observation:
+ 
+ \begin{itemize}
+    \item {\tt cFormulaTopoDX}: $$ residual = T_{loc,X} - l$$
+    \item {\tt cFormulaTopoDY}: $$ residual = T_{loc,Y} - l$$
+    \item {\tt cFormulaTopoDZ}: $$ residual = T_{loc,Z} - l$$
+
+    \item {\tt cFormulaTopoHz}: $$ residual =  \arctan\left(T_{loc,X}, T_{loc,Y}\right) - l $$
+\end{itemize}
+
+### Topo formulas
+ Then for each type of observation:
+ 
+ \begin{itemize}
+    \item {\tt cFormulaTopoZen}:
+    $$ ref = 0.12 . \frac { hz\_dist\_ellips\left( T, O \right) }
+                          { 2 . earth\_radius} $$
+    $$ d_{hz} =  \| T_{loc,X}, T_{loc,Y} \| $$
+    $$ residual =  \arctan\left(d_{hz}, T_{loc,Z}\right) - ref - l $$
+    \item {\tt cFormulaTopoDist}: $$  residual =  \| T_{lol} \| - l $$
+
+ \end{itemize}
+
+ Angles residuals are put in $\left[ -\pi, + \pi \right]$ interval.
 
 ###
 Operators (diffangmod)
