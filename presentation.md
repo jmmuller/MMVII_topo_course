@@ -715,11 +715,11 @@ The code \textbf{8} is not supported in MMVII, we have to replace it with:
 \begin{scriptsize}
 \begin{verbatim}
 MMVII TopoAdj Obs1 Obs1_out InitRTL FinalRTL NbIter=5 | grep "sigma0"
-Topo sigma0: 6.45514 (533 obs)
-Topo sigma0: 2.1159 (533 obs)
-Topo sigma0: 1.04765 (533 obs)
-Topo sigma0: 1.04765 (533 obs)
-Topo sigma0: 1.04765 (533 obs)
+Topo sigma0: 6.43291 (533 obs)
+Topo sigma0: 2.10101 (533 obs)
+Topo sigma0: 0.896159 (533 obs)
+Topo sigma0: 0.896159 (533 obs)
+Topo sigma0: 0.896159 (533 obs)
 \end{verbatim}
 \end{scriptsize}
 
@@ -744,7 +744,6 @@ For this computation, in MMVII:
  * no obs code 8 (#FIX + 5)
  * no deactivated obs (skips obs with sigma<0)
  * coordinates constraints are not taken into account in statistics (for now)
- * approximative sigma0 is computed only on topo obs (no GCP or photo for now)
  * better initialization!?
  * ellipsoidal model
  * refraction coefficient is fixed (for now)
@@ -761,10 +760,10 @@ Other cons:
 
  * lacking many initialization methods
  * no 1D or 2D points
- * no points horizontal centering
- * no height differences
+ * no points horizontal centering or height differences
  * no PPM/target definition
  * not vertical deflexion
+ * sigma0 is computed only on topo obs (no GCP or photo)
 
 # Example 3
 
@@ -1019,18 +1018,12 @@ Steps:
 
  * write a formula in c++
  * register this formula in MMVII source
- * run
- 
-     MMVII GenCodeSymDer
- * or simply
- 
-     make full
-     
- * use this formula and its derivative in MMVII source
+ * run \textbf{MMVII GenCodeSymDer} or simply \textbf{make full}     
+ * use this formula in MMVII least squares
 
 
 ### {.fragile}
-MMVII/src/SymbDerGen/Formulas_Geom3D.h
+Implementation: MMVII/src/SymbDerGen/Formulas_Geom3D.h
 \begin{scriptsize}
 \begin{verbatim}
 class cDist3D
@@ -1061,8 +1054,7 @@ class cDist3D
 
 
 ### {.fragile}
-
-MMVII/src/SymbDerGen/GenerateCodes.cpp
+Registration: MMVII/src/SymbDerGen/GenerateCodes.cpp
 
 \begin{scriptsize}
 \begin{verbatim}
@@ -1093,7 +1085,7 @@ int cAppliGenCode::Exe()
 
 ### {.fragile}
 
-MMVII/src/GeneratedCodes/CodeGen_cDist3DVal.cpp
+Generated: MMVII/src/GeneratedCodes/CodeGen_cDist3DVal.cpp
 
 \begin{scriptsize}
 \begin{verbatim}
@@ -1123,7 +1115,7 @@ MMVII/src/GeneratedCodes/CodeGen_cDist3DVal.cpp
 
 
 ### {.fragile}
-MMVII/src/GeneratedCodes/CodeGen_cDist3DVDer.cpp
+Generated: MMVII/src/GeneratedCodes/CodeGen_cDist3DVDer.cpp
 \begin{columns}[T]
 \begin{column}{0.55\textwidth}
 \begin{scriptsize}
@@ -1157,7 +1149,6 @@ MMVII/src/GeneratedCodes/CodeGen_cDist3DVDer.cpp
 \begin{verbatim}
 
 
-
     double F14_ = (F11_ * F11_);
     double F13_ = (F10_ * F10_);
     double F16_ = (F14_ + F15_);
@@ -1189,70 +1180,290 @@ MMVII/src/GeneratedCodes/CodeGen_cDist3DVDer.cpp
 ## Topo formulas
 ### Topo formulas
 
+For Topo stations, the measurements are expressed in the instrument's local frame.
 
-All the measurements are expressed in the local survey station frame.
+\begin{figure}[!h]
+\centering
+\includegraphics[width=5.5cm]{img/framesTopo.png}
+\end{figure}
 
-The input data are:
+ * \texttt{Green}: projection SysCo
+ * \texttt{Blue}: adjustment RTL SysCo
+ * \texttt{Purple}: 3D point local vertical frame
+ * \texttt{Yellow}: instrument frame
 
- \begin{itemize}
-    \item $O_{RTL}$: station origin point in RTL SysCo
-    \item $T_{RTL}$: target point in RTL SysCo
-    \item $R_{St, RTL}$: rotation from station frame to RTL
-    \item $\omega_R$: the rotation axiator unknown
-    \item $l$: the measurement value
- \end{itemize}
- 
-### Topo formulas
- At first we compute target coordinates in station local frame $T_{loc}$:
 
- $$  T_{loc} = R_{Station, RTL}^T . (T_{RTL} - O_{RTL})  $$
- 
-### Topo formulas
- Then for each type of observation:
- 
- \begin{itemize}
-    \item {\tt cFormulaTopoDX}: $$ residual = T_{loc,X} - l$$
-    \item {\tt cFormulaTopoDY}: $$ residual = T_{loc,Y} - l$$
-    \item {\tt cFormulaTopoDZ}: $$ residual = T_{loc,Z} - l$$
+### {.fragile}
 
-    \item {\tt cFormulaTopoHz}: $$ residual =  \arctan\left(T_{loc,X}, T_{loc,Y}\right) - l $$
+Each instrument orientation rotation from RTL is computed via the local vertical frame at its origin:
+
+$$  R_{RTL \rightarrow Instr} = R_{Vert \rightarrow Instr} \cdot R_{RTL \rightarrow Vert}  $$
+
+Where $R_{RTL \rightarrow Vert}$ is computed bu the SysCo from station origin position and
+$R_{Vert \rightarrow Instr}$ is unknown, with a degree of liberty depending on the station orientation constraint.
+
+It is recorded in \texttt{cTopoObsSetStation} as:
+
+\begin{scriptsize}
+\begin{verbatim}
+tRot mRotSysCo2Vert; //rotation between global SysCo and vertical frame
+tRot mRotVert2Instr; //current value rotation from vert to instr frame
+cPt3dr_UK mRotOmega; //mRotVert2Instr unknown
+\end{verbatim}
+\end{scriptsize}
+
+###
+
+The possible orientation constraints are:
+\begin{itemize}
+   \item \texttt{\#FIX}: \texttt{mRotOmega} is fixed for $x$, $y$ and $z$
+   \item \texttt{\#VERT}: \texttt{mRotOmega} is fixed for $x$ and $y$
+   \item \texttt{\#BASC}: \texttt{mRotOmega} has no fixed component
 \end{itemize}
 
-### Topo formulas
- Then for each type of observation:
+###
+
+The transformation from RTL to instrument local frame is:
+
+$$  T_{Instr} = R_{RTL \rightarrow Instr} \cdot (T_{RTL} - O_{RTL}) $$
+
+Where:
+
+ \begin{itemize}
+    \item $T_{Instr}$: target point in instrument local frame
+    \item $O_{RTL}$: station origin point in RTL SysCo
+    \item $T_{RTL}$: target point in RTL SysCo
+    \item $R_{RTL \rightarrow Instr}$: rotation from RTL to instrument frame
+ \end{itemize}
+
+###
+
+Then for each type of observation ($l$ being the measurement value):
  
  \begin{itemize}
+    \item {\tt cFormulaTopoDX}: $$ residual = T_{Instr_X} - l$$
+    \item {\tt cFormulaTopoDY}: $$ residual = T_{Instr_Y} - l$$
+    \item {\tt cFormulaTopoDZ}: $$ residual = T_{Instr_Z} - l$$
+  \end{itemize}
+
+###
+  \begin{itemize}
+    \item {\tt cFormulaTopoHz}: $$ residual =  \arctan\left(T_{Instr_X}, T_{Instr_Y}\right) - l $$
     \item {\tt cFormulaTopoZen}:
     $$ ref = 0.12 . \frac { hz\_dist\_ellips\left( T, O \right) }
                           { 2 . earth\_radius} $$
-    $$ d_{hz} =  \| T_{loc,X}, T_{loc,Y} \| $$
-    $$ residual =  \arctan\left(d_{hz}, T_{loc,Z}\right) - ref - l $$
-    \item {\tt cFormulaTopoDist}: $$  residual =  \| T_{lol} \| - l $$
-
+    $$ d_{hz} =  \| T_{Instr_X}, T_{Instr_Y} \| $$
+    $$ residual =  \arctan\left(d_{hz}, T_{Instr_Z}\right) - ref - l $$
+    \item {\tt cFormulaTopoDist}: $$  residual =  \| T_{Instr} \| - l $$
  \end{itemize}
 
- Angles residuals are put in $\left[ -\pi, + \pi \right]$ interval.
+Angles residuals are in $\left[ -\pi, + \pi \right]$ interval.
 
-###
-Operators (diffangmod)
+### {.fragile}
+
+This is implemented like this:
+
+\begin{scriptsize}
+\begin{verbatim}
+class cFormulaTopoHz
+{
+public :
+   std::string FormulaName() const { return "TopoHz";}
+   std::vector<std::string>  VNamesUnknowns()  const
+   {
+     // Instrument pose with 6 unknowns : 3 for center, 3 for axiator
+     // target pose with 3 unknowns : 3 for center
+     return  Append(NamesPose("Ci","Wi"),NamesP3("P_to"));
+   }
+   std::vector<std::string>    VNamesObs() const
+   {
+     // for the instrument pose, the 3x3 current rotation matrix
+     // as "observation/context" and the measure value
+     return  Append(NamesMatr("mi",cPt2di(3,3)), {"val"} );
+   }
+\end{verbatim}
+\end{scriptsize}
+   
+### {.fragile}
+
+\begin{scriptsize}
+\begin{verbatim}
+   template <typename tUk>
+               std::vector<tUk> formula
+               (
+                  const std::vector<tUk> & aVUk,
+                  const std::vector<tUk> & aVObs
+               ) const
+   {
+       cPoseF<tUk>  aPoseInstr2RTL(aVUk,0,aVObs,0,true);
+       cPtxd<tUk,3> aP_to = VtoP3(aVUk,6);
+       auto       val = aVObs[9];
+       cPtxd<tUk,3>  aP_to_instr = aPoseInstr2RTL.Inverse().Value(aP_to);
+       auto az = ATan2( aP_to_instr.x(), aP_to_instr.y() );
+       return {  DiffAngMod(az, val) };
+   }
+};
+\end{verbatim}
+\end{scriptsize}
+
 
 ## Least squares
 ### Least squares
 
-12.3 Non linear system
+MMVII least square system is described in documentation (12.3 and 12.6).
 
-unknowns 12.6
 
-## Topo
-###
-Doc 12.8
 
+### Topo in least squares
+
+The topo classes are in MMVII/src/Topo/:
+
+ * \texttt{cTopoPoint}: a point used with survey measurements. Keeps a pointer to the unknowns from GCP or Ori.
+ * \texttt{cTopoObs}: an observation corresponding to a formula, between several points.
+ * \texttt{cTopoObsSet}: a set of observations. The set is used to share common parameters between several observations. e.g., \texttt{cTopoObsSetStation} adds a rotation corresponding to an instrument setting.   
+ * \texttt{cBA\_Topo}: the class that handles the least square part. It records all the points and sets.
+
+
+
+### {.fragile}
+
+Topo formulas map:
+
+\begin{scriptsize}
+\begin{verbatim}
+std::map<eTopoObsType, cCalculator<double>*> mTopoObsType2equation =
+    {
+        {eTopoObsType::eDist, EqTopoDist(true,1)},
+        {eTopoObsType::eHz,   EqTopoHz(true,1)},
+        {eTopoObsType::eZen,  EqTopoZen(true,1)},
+        {eTopoObsType::eDX,   EqTopoDX(true,1)},
+        {eTopoObsType::eDY,   EqTopoDY(true,1)},
+        {eTopoObsType::eDZ,   EqTopoDZ(true,1)},
+    };
+\end{verbatim}
+\end{scriptsize}
+
+### {.fragile}
+Unknowns specific to topo are only \textbf{cTopoObsSet} parameters
+(instruments rotation for now):
+
+\begin{scriptsize}
+\begin{verbatim}
+void cBA_Topo::AddToSys(cSetInterUK_MultipeObj<tREAL8> & aSet)
+{;
+    for (auto& anObsSet: mAllObsSets)
+        anObsSet->AddToSys(aSet);
+}
+
+void cTopoObsSetStation::AddToSys(cSetInterUK_MultipeObj<tREAL8> & aSet)
+{
+    cTopoObsSet::AddToSys(aSet);
+    aSet.AddOneObj(&mRotOmega);
+    aSet.AddOneObj(this); // to have OnUpdate called on SetVUnKnowns
+}
+
+void cTopoObsSetStation::OnUpdate()
+{
+    mRotOmega.Pt() = mRotVert2Instr.Inverse(mRotOmega.Pt()); // ???
+    mRotVert2Instr = mRotVert2Instr *
+            cRotation3D<tREAL8>::RotFromAxiator(mRotOmega.Pt());
+    updateVertMat(); // update mRotSysCo2Vert with new st pos
+    mRotOmega.Pt() = cPt3dr(0,0,0); // void delta after modif
+}
+\end{verbatim}
+\end{scriptsize}
+
+
+### {.fragile}
+
+Adding new observations to a \textbf{cResolSysNonLinear}:
+
+\begin{scriptsize}
+\begin{verbatim}
+void cBA_Topo::AddTopoEquations(cResolSysNonLinear<tREAL8> & aSys)
+{
+  for (auto &obsSet: mAllObsSets)
+    for (size_t i=0;i<obsSet->nbObs();++i)
+    {
+      cTopoObs* obs = obsSet->getObs(i);
+      auto equation = getEquation(obs->getType());
+      aSys.CalcAndAddObs(equation, obs->getIndices(),
+                         obs->getVals(), obs->getWeights());
+\end{verbatim}
+\end{scriptsize}
+
+
+### {.fragile}
+
+Getting unknowns indices for an observation:
+
+\begin{scriptsize}
+\begin{verbatim}
+std::vector<int> cTopoObs::getIndices() const
+{
+  std::vector<int> indices;
+  switch (mSet->getType()) {
+  case eTopoObsSetType::eStation:
+  {
+    cTopoObsSetStation* set = dynamic_cast<cTopoObsSetStation*>(mSet);
+    ... // checks
+    
+    set->getPtOrigin()->getUK()->PushIndexes(indices);
+    
+    set->getRotOmega().PushIndexes(indices);
+    
+    cObjWithUnkowns<tREAL8>* toUk =
+        mBA_Topo->getPoint(mPtsNames[1]).getUK();
+    int nbIndBefore = indices.size();
+    toUk->PushIndexes(indices);
+    
+    break;
+  }
+  ...
+return indices;
+}
+\end{verbatim}
+\end{scriptsize}
+
+
+### {.fragile}
+
+Getting "observation/context" for an observation:
+
+\begin{scriptsize}
+\begin{verbatim}
+std::vector<tREAL8> cTopoObs::getVals() const
+{
+  std::vector<tREAL8> vals;
+  switch (mSet->getType()) {
+  case eTopoObsSetType::eStation:
+  {
+    cTopoObsSetStation* set = dynamic_cast<cTopoObsSetStation*>(mSet);
+    ... // checks
+    
+    set->PushRotObs(vals);
+    if (mType==eTopoObsType::eZen)
+      ...   vals.push_back(ref_cor);
+    vals.insert(std::end(vals),std::begin(mMeas),std::end(mMeas));
+    break;
+  }
+  ...
+  return vals;
+}
+
+void cTopoObsSetStation::PushRotObs(std::vector<double> & aVObs) const
+{    // fill aPoseRTL2Instr
+    (mRotVert2Instr * mRotSysCo2Vert).Mat().PushByCol(aVObs);
+}
+\end{verbatim}
+\end{scriptsize}
 
 
 # Direct Dev
 ###
 
  * refraction parameter
+ * TopoW parameter
  * Some initializations
  * new bench
  * Code 4
