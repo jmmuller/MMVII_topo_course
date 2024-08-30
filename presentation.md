@@ -592,6 +592,21 @@ But:
 If a station only has distances measurements, it is automatically set as a \texttt{\#FIX} station, since this station orientation unknowns can't be estimated.
 
 
+### Centering {.fragile}
+
+For two points that should be one above an other:
+\begin{verbatim}
+#FIX
+14  PtA  PtB  0   0.001 * PtA and PtB have the same
+15  PtA  PtB  0   0.001 * horizontal position
+
+16  PtA  PtB  0.1 0.001 * PtB is 10cm above PtA
+\end{verbatim}
+
+Code \texttt{16} is a difference of height only for points with the same horizontal position!
+
+Use the future code \texttt{4} for generic height difference.
+
 # Example 2
 
 ### Comp3D to MMVII
