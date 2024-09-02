@@ -607,6 +607,8 @@ Code \texttt{16} is a difference of height only for points with the same horizon
 
 Use the future code \texttt{4} for generic height difference.
 
+Application to example 1?
+
 # Example 2
 
 ### Comp3D to MMVII
@@ -775,7 +777,7 @@ Other cons:
 
  * lacking many initialization methods
  * no 1D or 2D points
- * no points horizontal centering or height differences
+ * no height differences
  * no PPM/target definition
  * not vertical deflexion
  * sigma0 is computed only on topo obs (no GCP or photo)
@@ -987,7 +989,6 @@ Vertical:
 
  - stations and targets heights
  - height differences
- - horizontal centering
  - 2D and 1D points ?
  
 ### Missing features
@@ -1479,7 +1480,10 @@ void cTopoObsSetStation::PushRotObs(std::vector<double> & aVObs) const
 
  * refraction parameter
  * TopoW parameter
- * Some initializations
+ * initializations
+     * resection
+     * centering
+     * basc ori
  * new bench
  * Code 4
  * unknown refraction
