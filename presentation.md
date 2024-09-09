@@ -587,10 +587,6 @@ But:
 \end{verbatim}
 \end{scriptsize}
 
-### Special case for distance-only
-
-If a station only has distances measurements, it is automatically set as a \texttt{\#FIX} station, since this station orientation unknowns can't be estimated.
-
 
 ### Centering {.fragile}
 
@@ -603,11 +599,20 @@ For two points that should be one above an other:
 16  PtA  PtB  0.1 0.001 * PtB is 10cm above PtA
 \end{verbatim}
 
-Code \texttt{16} is a difference of height only for points with the same horizontal position!
+Warning: code \texttt{16} is a difference of height only for points with the same horizontal position!
 
 Use the future code \texttt{4} for generic height difference.
 
 Application to example 1?
+
+
+### Orientation special case
+
+If a station has no orientation measurements (no hz angle nor dx/dy with a significative distance), it is automatically set as a \texttt{\#FIX} station.
+
+It simplifies the usage of distances between points when there are no angle measurements (explicit \texttt{\#FIX} not required).
+
+In the future, distances measurements may exist outside of stations and then have no orientations unknowns.
 
 # Example 2
 
@@ -732,8 +737,8 @@ The code \textbf{8} is not supported in MMVII, we have to replace it with:
 \begin{scriptsize}
 \begin{verbatim}
 MMVII TopoAdj Obs1 Obs1_out InitRTL FinalRTL NbIter=5 | grep "sigma0"
-Topo sigma0: 6.43291 (533 obs)
-Topo sigma0: 2.10101 (533 obs)
+Topo sigma0: 6.5339 (533 obs)
+Topo sigma0: 2.08124 (533 obs)
 Topo sigma0: 0.896159 (533 obs)
 Topo sigma0: 0.896159 (533 obs)
 Topo sigma0: 0.896159 (533 obs)
@@ -973,13 +978,159 @@ or:
 
 # Example 4
 
-### Polygon
+### Polygon K
 
 \begin{figure}[!h]
 \centering
 \includegraphics[width=5.5cm]{img/polygon}
 \includegraphics[width=5.5cm]{img/polygon_comp}
 \end{figure}
+
+### Polygon K
+
+ * two types of coded targets
+ * topo measurements
+ * two cameras in a rigid bloc
+ * no initial calibration
+ * no initial orientation
+
+### {.fragile}
+
+Extract both targets types on images:
+
+\begin{small}
+\begin{verbatim}
+MMVII CodedTargetCircExtract ".*JPG" \
+    inputs/CERN_Nbb14_*_FullSpecif.xml \
+    DiamMin=8 OutPointsMeasure=TargetsC ZoomVisuEllipse=1
+    
+MMVII CodedTargetExtract ".*JPG" \
+    inputs/IGNIndoor_Nbb12_*_FullSpecif.xml \
+    DMD=30 Debug=1023 Margin=0.3 Tolerance=0.2 \
+    OutPointsMeasure=TargetsI
+\end{verbatim}
+\end{small}
+
+
+### {.fragile}
+Add the camera specs in MMVII/MMVII-RessourceDir/CameraDataBase.xml:
+\begin{small}
+\begin{verbatim}
+     <Pair>
+        <K>"SONY A6400"</K>
+        <V>
+           <Name>"SONY A6400"</Name>
+           <SzPix_micron> 3.9 3.9 </SzPix_micron>
+           <SzSensor_mm> 23.4  15.6 </SzSensor_mm>
+           <NbPixels>6000  4000</NbPixels>
+        </V>
+     </Pair>
+\end{verbatim}
+\end{small}
+
+### {.fragile}
+
+Set metadata:
+\begin{small}
+\begin{verbatim}
+#specify the camera model
+MMVII EditCalcMTDI Std ModelCam ImTest=C1_00100.JPG \
+    Modif=[.*.JPG,"SONY A6400",0] Save=1
+    
+#specify focal length
+MMVII EditCalcMTDI Std Focalmm ImTest=C1_00100.JPG \
+    Modif=[".*.JPG",16,0] Save=1
+
+#specify groups of images (C1=Camera 1) & (C2=Camera 2)
+MMVII EditCalcMTDI Std AdditionalName \
+    ImTest=C1_00100.JPG \
+    Modif=["(.*)_.*.JPG","\$1",0] Save=1
+\end{verbatim}
+\end{small}
+
+
+### {.fragile}
+
+Compute topo:
+\begin{small}
+\begin{verbatim}
+MMVII ImportGCP inputs/coord.cor ANXYZ InitTopoRTL \
+    ChSys=[L93,"RTL*657700*6860700*0*IGNF:LAMB93"] \
+    AddInfoFree=0 Sigma=0.001 Comment=*
+
+mkdir -p MMVII-PhgrProj/Topo/TopoObs/
+cp inputs/polygone.obs MMVII-PhgrProj/Topo/TopoObs/
+
+MMVII TopoAdj TopoObs TopoOut InitTopoRTL TargetsTopoRTL
+\end{verbatim}
+\end{small}
+
+### {.fragile}
+
+Initial orientation on GCPs by space resection:
+
+\begin{small}
+\begin{verbatim}
+#create an initial calibration with default params
+MMVII OriCreateCalib ".*JPG" CalibInit Degree=[3,1,1]
+
+# Add 3d coords to extracted 2d coords"
+cp MMVII-PhgrProj/PointsMeasure/TargetsTopoRTL/* \
+    MMVII-PhgrProj/PointsMeasure/TargetsI/
+cp MMVII-PhgrProj/PointsMeasure/TargetsTopoRTL/* \
+    MMVII-PhgrProj/PointsMeasure/TargetsC/
+
+#filter to keep only images adapted to space resection
+MMVII OriPoseEstimCheckGCPDist ".*JPG" TargetsC
+
+#calibrated space resection
+MMVII OriPoseEstimSpaceResection \
+    SetFiltered_GCP_OK_Resec.xml \
+    TargetsC CalibInit Resec
+\end{verbatim}
+\end{small}
+
+### {.fragile}
+
+Bundle adjustment:
+\begin{small}
+\begin{verbatim}
+# init block cam
+MMVII BlockCamInit SetFiltered_GCP_OK_Resec.xml Resec \
+    "(.*)_(.*).JPG" [1,2] RigInit ShowByBloc=1
+
+# use block cam in BA
+MMVII OriBundleAdj SetFiltered_GCP_OK_Resec.xml Resec BA \
+    GCPDir=TargetsC GCPW=[1,0.5] TopoDirIn=TopoObs \
+    BRDirIn=RigInit BRW=[1e-2,1e-5] NbIter=20 \
+    GCPDirOut=FinalRTL
+
+# export to L93
+MMVII GCPChSysCo L93 FinalRTL FinalL93
+
+# reports
+MMVII ReportGCP SetFiltered_GCP_OK_Resec.xml FinalL93 BA
+\end{verbatim}
+\end{small}
+
+
+### {.fragile}
+
+Both targets types can be added to bundle adjustment, but 3D coords must be split between both \texttt{PointsMeasure} folders.
+
+\begin{small}
+\begin{verbatim}
+MMVII OriBundleAdj SetFiltered_GCP_OK_Resec.xml Resec BA \
+    GCPDir=TargetsC GCPW=[1,0.5] TopoDirIn=TopoObs \
+    BRDirIn=RigInit BRW=[1e-2,1e-5] NbIter=20 \
+    AddGCPW=[[TargetsI,1,0.5]]  GCPDirOut=AllPtsOut
+\end{verbatim}
+\end{small}
+
+
+
+
+
 
 # TODO
 
@@ -1488,6 +1639,7 @@ void cTopoObsSetStation::PushRotObs(std::vector<double> & aVObs) const
  * Code 4
  * unknown refraction
  * #CAM
+ * codes 3 and 4 outside of cTopoObsSetStation
 
 ## Refraction parameter
 ### Refraction parameter
