@@ -352,6 +352,8 @@ known points is 0.001m and that lines starting with '*' are comment lines.
     MMVII ImportGCP inputs/coords.cor ANXYZ InitL93 \
       ChSys=[L93] AddInfoFree=0 Sigma=0.001 Comment=*
 
+Here the sigma is given in computation frame, there is no conversion for now.
+
 ###
 
 In the resulting file *MMVII-PhgrProj/PointsMeasure/InitL93/MesGCP-coords.xml*,
@@ -487,7 +489,7 @@ and after 10 iterations it stabilizes at $\sigma_{0 final} = 1.7$.
 The output topo directory contains a single xml file with all the measurements and some output values (residuals,
 stations orientations...). It can be used as topo input file.
 
-For now, there is no export of final coordinates uncertaincy...
+For now, there is no computation of final coordinates uncertaincy...
 
 
 The last step is to convert the RTL coordinates to Lambert 93:
@@ -873,6 +875,9 @@ Get 3d coords for ground targets, convert to RTL:
     MMVII EditCalcMTDI Std Focalmm \
        Modif=['IGN2_.*-cam-.*.jpg',12,1] Save=1
 
+Warning: **'$1'** for linux, **"$1"** for windows !
+    
+
 ### Cameras orientation
 
     # copy calibs
@@ -976,6 +981,8 @@ or:
        AddGCPW=[[GND,1,0.5]] TopoDirIn=BlocCar \
        PPFzCal=".*" PatFzCenters=".*" PatFzOrient=".*" \
        TopoDirOut=BlocCarOut GCPDirOut=CarOut NbIter=20
+
+
 
 # Example 4
 
@@ -1156,6 +1163,7 @@ Misc:
  - refraction parameter
  - relative sigmas
  - more useful error messages
+ - units choice?
 
 ### Missing features
 
