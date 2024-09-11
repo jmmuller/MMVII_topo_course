@@ -14,7 +14,7 @@ In its global compensation stage, **MMVII** can handle:
   * ground control points (GCP)
   * distortion models
   * rigid cameras blocks
-  * clinometers (soon ?)
+  * clinometers (in progress)
   * and topometric survey measurements!
 
 
@@ -156,7 +156,7 @@ MMVII Bench 1
 
 A **MMVII** project root is a directory containing a set of image files or an XML file containing a list of image files names (*SetOfName*).
 
-**MMVII** will write and read data in a directory named *MMVII-PhgrProj* that will be created automatically when needed.
+**MMVII** will write and read data in a subdirectory named *MMVII-PhgrProj* that will be created automatically when needed.
 
 The file structure is as follows:
 
@@ -190,14 +190,14 @@ Example:
 With initial orientation files *MMVII-PhgrProj/Ori/Init/\*.xml*,
 just give *Init* as command line argument.
 
-
+Completion works for that!
 
 
 
 # SysCo
 
 ### Introduction
-Coordinate systems (SysCo) types supported by MMVII are:
+The main coordinate systems (SysCo) types supported by MMVII are:
 
  * **Local**: any Euclidian frame, without any geolocalization or vertical direction knowledge
  * **GeoC**: geocentric coordinates
@@ -263,8 +263,6 @@ The following measurements types are currently supported:
   * zenithal angles
   * direct Euclidian vectors
 
-The measurements can be made between cameras poses, GCPs or undeclared points that will be inserted into the last GCP set of the adjustment.
-
 
 ### Usage
 
@@ -278,7 +276,7 @@ Two MMVII commands can use topo measurements in compensation:
 The topo measurements files can be given as a set of MMVII json or xml files, or in a simplified text format (named *OBS* file) inherited from IGN's
 Comp3D micro-geodesy compensation software.
 
-All the measurements files must be in the *MMVII-PhgrProj/Topo/[TopoObsName]* folder.
+All the measurements files must be in the *MMVII-PhgrProj/Topo/[TopoName]* folder.
 
 ## OBS format
 
@@ -330,7 +328,7 @@ It corresponds to this configuration:
 \end{figure}
 
 ### 3D points file
-The initial coordinates of the 4 points, in Lambert 93, are in a simple text file (*inputs/coords.txt*):
+The initial coordinates of the 4 points, in Lambert 93, are in a simple text file (*inputs/coords.cor*):
 
     * 1st column:  0 = free point
     1  PtA  657700.000  6860700.000  10.000
@@ -351,7 +349,7 @@ We also specify that the points that have '0' for their additional\_info are fre
 known points is 0.001m and that lines starting with '*' are comment lines.
 
 
-    MMVII ImportGCP inputs/coords.txt ANXYZ InitL93 \
+    MMVII ImportGCP inputs/coords.cor ANXYZ InitL93 \
       ChSys=[L93] AddInfoFree=0 Sigma=0.001 Comment=*
 
 ###
@@ -390,7 +388,7 @@ The file *MMVII-PhgrProj/PointsMeasure/InitRTL/CurSysCo.xml*, records the SysCo 
 ### Measurements {.fragile}
 
  * an instrument on PtA measures hz angle, zen angle and distance to PtB and PtC
- * an instrument on PtD make the same to PtB and PtC
+ * an instrument on PtD makes the same to PtB and PtC
 
 
 The corresponding *OBS* file (*inputs/meas.obs)* is:
@@ -489,6 +487,8 @@ and after 10 iterations it stabilizes at $\sigma_{0 final} = 1.7$.
 The output topo directory contains a single xml file with all the measurements and some output values (residuals,
 stations orientations...). It can be used as topo input file.
 
+For now, there is no export of final coordinates uncertaincy...
+
 
 The last step is to convert the RTL coordinates to Lambert 93:
 
@@ -504,9 +504,9 @@ Each station has orientation constraints that have to be given before the statio
 
 The possible orientation constraints are:
 
-   * \texttt{\#FIX}: the station is axis-aligned, it is verticalized and oriented to North
+   * \texttt{\#FIX}: the station is axis-aligned, it is verticalized and oriented to north
    * \texttt{\#VERT}: the station is verticalized and only horizontal orientation is free
-   * \texttt{\#BASC}: the station orientation has 3 degrees of freedom, meaning non-verticalized and not oriented to North
+   * \texttt{\#BASC}: the station orientation has 3 degrees of freedom, meaning non-verticalized and not oriented to north
 
 ### 
 After a \texttt{\#} line (\texttt{\#FIX}, \texttt{\#VERT} or \texttt{\#BASC}), all the following stations have the new orientation constraint until the next \texttt{\#} line.
@@ -763,12 +763,13 @@ Parameters:                  262
 
 For this computation, in MMVII:
 
- * no obs code 8 (#FIX + 5)
+ * no obs code 8 (#FIX + code 5)
  * no deactivated obs (skips obs with sigma<0)
  * coordinates constraints are not taken into account in statistics (for now)
  * better initialization!?
  * ellipsoidal model
  * refraction coefficient is fixed (for now)
+ * no sigma exports
 
 ###
 
@@ -1154,6 +1155,7 @@ Misc:
 
  - refraction parameter
  - relative sigmas
+ - more useful error messages
 
 ### Missing features
 
@@ -1462,12 +1464,12 @@ public :
                   const std::vector<tUk> & aVObs
                ) const
    {
-       cPoseF<tUk>  aPoseInstr2RTL(aVUk,0,aVObs,0,true);
-       cPtxd<tUk,3> aP_to = VtoP3(aVUk,6);
-       auto       val = aVObs[9];
-       cPtxd<tUk,3>  aP_to_instr = aPoseInstr2RTL.Inverse().Value(aP_to);
-       auto az = ATan2( aP_to_instr.x(), aP_to_instr.y() );
-       return {  DiffAngMod(az, val) };
+     cPoseF<tUk>  aPoseInstr2RTL(aVUk,0,aVObs,0,true);
+     cPtxd<tUk,3> aP_to = VtoP3(aVUk,6);
+     auto       val = aVObs[9];
+     cPtxd<tUk,3>  aP_to_instr = aPoseInstr2RTL.Inverse().Value(aP_to);
+     auto az = ATan2( aP_to_instr.x(), aP_to_instr.y() );
+     return {  DiffAngMod(az, val) };
    }
 };
 \end{verbatim}
