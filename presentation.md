@@ -415,10 +415,9 @@ The corresponding *OBS* file (*inputs/meas.obs)* is:
 
 ### Measurements
 
-This file has to be copied into a subdirectory of *MMVII-PhgrProj/Topo*:
+This file has to be imported into a subdirectory of *MMVII-PhgrProj/Topo*:
 
-    mkdir -p MMVII-PhgrProj/Topo/Obs1/
-    cp inputs/meas.obs MMVII-PhgrProj/Topo/Obs1/
+    MMVII ImportOBS inputs/meas.obs Obs1
 
 
 ### Unknowns count
@@ -478,7 +477,7 @@ Command line ?
 In our example, the input topo directory is *Obs1* and the input PointsMeasure is *InitRTL*.
 We give output directories names for topo and points.
 
-    MMVII TopoAdj Obs1 Obs1_out InitRTL FinalRTL
+    MMVII TopoAdj Obs1 InitRTL Obs1_out FinalRTL
 
 The final $\sigma_0$ value should be around 1 if everything goes well.
 In this example, $\sigma_{0 init} > 5000$, because the initial coordinates of PtB and PtC are approximate,
@@ -671,13 +670,9 @@ To import a Comp3D \textbf{COR} file using only codes \textbf{0} and \textbf{1}:
 Sigma can't be read with \textbf{ImportGCP}.
 Many other point codes are used in Comp3D, but only \textbf{0} and \textbf{1} are supported in MMVII.
 
-### Adjustment {.fragile}
+### Obs file {.fragile}
 
-\pause
-
-    mkdir -p MMVII-PhgrProj/Topo/Obs1/
-    cp figure.obs MMVII-PhgrProj/Topo/Obs1/
-    MMVII TopoAdj Obs1 Obs1_out InitRTL FinalRTL
+    MMVII ImportOBS figure.obs Obs1
 
 \pause
 
@@ -712,7 +707,8 @@ The \textbf{OBS} file starts with:
 \end{verbatim}
 \end{scriptsize}
 
-The code \textbf{8} is an azimuth constraint, saying that HLLPI0005 is in east direction from HLLST0001. It fixes the orientation ambiguity of the system and kickstarts the initial coordinates estimation.
+The code \textbf{8} is an azimuth constraint, saying that HLLPI0005 is in east direction from HLLST0001.
+It fixes the orientation ambiguity of the system and kickstarts the initial coordinates estimation.
 
 ### Obs file {.fragile}
 The code \textbf{8} is not supported in MMVII, we have to replace it with:
@@ -738,7 +734,7 @@ The code \textbf{8} is not supported in MMVII, we have to replace it with:
 ### Results {.fragile}
 \begin{scriptsize}
 \begin{verbatim}
-MMVII TopoAdj Obs1 Obs1_out InitRTL FinalRTL NbIter=5 | grep "sigma0"
+MMVII TopoAdj Obs1 InitRTL Obs1_out FinalRTL NbIter=5 | grep "sigma0"
 Topo sigma0: 6.5339 (533 obs)
 Topo sigma0: 2.08124 (533 obs)
 Topo sigma0: 0.896159 (533 obs)
@@ -946,8 +942,7 @@ as a set of local euclidian measurements:
        SNXYZ Targets ChSys=[L93,RTL] Sigma=-1
 
     #import topo: coded targets coords in car frame
-    mkdir -p MMVII-PhgrProj/Topo/BlocCar/
-    cp inputs/car_xyz.obs MMVII-PhgrProj/Topo/BlocCar/
+    MMVII ImportOBS inputs/car_xyz.obs BlocCar
 
 ### Adjust car frame
     # adjust with frozen cameras
@@ -1066,10 +1061,9 @@ MMVII ImportGCP inputs/coord.cor ANXYZ InitTopoRTL \
     ChSys=[L93,"RTL*657700*6860700*0*IGNF:LAMB93"] \
     AddInfoFree=0 Sigma=0.001 Comment=*
 
-mkdir -p MMVII-PhgrProj/Topo/TopoObs/
-cp inputs/polygone.obs MMVII-PhgrProj/Topo/TopoObs/
+MMVII ImportOBS inputs/polygone.obs TopoObs
 
-MMVII TopoAdj TopoObs TopoOut InitTopoRTL TargetsTopoRTL
+MMVII TopoAdj TopoObs InitTopoRTL TopoOut TargetsTopoRTL
 \end{verbatim}
 \end{small}
 
