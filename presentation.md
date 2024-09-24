@@ -387,6 +387,24 @@ SysCo definition:
 
 The file *MMVII-PhgrProj/PointsMeasure/InitRTL/CurSysCo.xml*, records the SysCo of *InitRTL*.
 
+### SysCo
+
+This transfomation can also be done during *ImportGCP*:
+
+    MMVII ImportGCP inputs/coords.cor ANXYZ InitRTL \
+      ChSys="[L93,RTL*657700*6860700*0*IGNF:LAMB93]" \
+      AddInfoFree=0 Sigma=0.001 Comment=*
+
+\pause
+
+*ImportGCP* can also automatically create a *RTL* SysCo, with its origin equal to the average of the input coordinates:
+just give **RTL** as the destination SysCo. This new SysCo will be saved as *MMVII-PhgrProj/SysCo/RTL.xml*, making
+the SysCo available for every following command as **RTL**:
+
+    MMVII ImportGCP inputs/coords.cor ANXYZ InitRTL \
+      ChSys=[L93,RTL] AddInfoFree=0 Sigma=0.001 Comment=*
+
+
 ### Measurements {.fragile}
 
  * an instrument on PtA measures hz angle, zen angle and distance to PtB and PtC
@@ -865,7 +883,7 @@ Get 3d coords for ground targets, convert to RTL:
        Save=1
 
     # focal 8mm for 125 130 138, the others 12mm
-    MMVII EditCalcMTDI Std Focalmm =\
+    MMVII EditCalcMTDI Std Focalmm \
        Modif=['IGN2_.*-cam-223..1(25|30|38)-.*.jpg',8,0]\
        Save=1
     MMVII EditCalcMTDI Std Focalmm \
@@ -1370,7 +1388,7 @@ Each instrument orientation rotation from RTL is computed via the local vertical
 
 $$  R_{RTL \rightarrow Instr} = R_{Vert \rightarrow Instr} \cdot R_{RTL \rightarrow Vert}  $$
 
-Where $R_{RTL \rightarrow Vert}$ is computed bu the SysCo from station origin position and
+Where $R_{RTL \rightarrow Vert}$ is computed by the SysCo from station origin position and
 $R_{Vert \rightarrow Instr}$ is unknown, with a degree of liberty depending on the station orientation constraint.
 
 It is recorded in \texttt{cTopoObsSetStation} as:
