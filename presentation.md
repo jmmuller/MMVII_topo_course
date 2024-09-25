@@ -860,16 +860,12 @@ Get 3d coords for ground targets, convert to RTL:
 \pause
     
     MMVII ImportGCP inputs/coord_gnd.cor SNXYZ GND \
-       ChSys=[L93,'RTL*644000*6836370*0*IGNF:LAMB93'] \
-       Sigma=0.001
+       ChSys=[L93,RTL] Sigma=0.001
 
-### Ground targets
+\pause
 
-    # make SysCo shortcut 'RTL'
-    cp MMVII-PhgrProj/PointsMeasure/GND/CurSysCo.xml \
-       MMVII-PhgrProj/SysCo/RTL.xml
+Copy 2d mes for gnd points:
 
-    # copy 2d mes for gnd points
     cp inputs/gnd_img_V2/* \
        MMVII-PhgrProj/PointsMeasure/GND/
 
@@ -1414,13 +1410,13 @@ The possible orientation constraints are:
 
 The transformation from RTL to instrument local frame is:
 
-$$  T_{Instr} = R_{RTL \rightarrow Instr} \cdot (T_{RTL} - O_{RTL}) $$
+$$  T_{Instr} = R_{RTL \rightarrow Instr} \cdot (T_{RTL} - S_{RTL}) $$
 
 Where:
 
  \begin{itemize}
     \item $T_{Instr}$: target point in instrument local frame
-    \item $O_{RTL}$: station origin point in RTL SysCo
+    \item $S_{RTL}$: station origin point in RTL SysCo
     \item $T_{RTL}$: target point in RTL SysCo
     \item $R_{RTL \rightarrow Instr}$: rotation from RTL to instrument frame
  \end{itemize}
@@ -1439,7 +1435,7 @@ Then for each type of observation ($l$ being the measurement value):
   \begin{itemize}
     \item {\tt cFormulaTopoHz}: $$ residual =  \arctan\left(T_{Instr_X}, T_{Instr_Y}\right) - l $$
     \item {\tt cFormulaTopoZen}:
-    $$ ref = 0.12 . \frac { hz\_dist\_ellips\left( T, O \right) }
+    $$ ref = 0.12 . \frac { hz\_dist\_ellips\left( T, S \right) }
                           { 2 . earth\_radius} $$
     $$ d_{hz} =  \| T_{Instr_X}, T_{Instr_Y} \| $$
     $$ residual =  \arctan\left(d_{hz}, T_{Instr_Z}\right) - ref - l $$
@@ -1717,6 +1713,30 @@ Resection algorithm:
 \url{https://www.aftopo.org/lexique/relevement-sur-trois-points-calcul-dun/}
 (RELÈVEMENT BARYCENTRIQUE)
   * implement in *MMVII/src/Topo/topoinit.cpp*, call in *cBA_Topo::tryInit()*
+
+## Code 4
+### Code 4
+
+
+For ellipsoid height difference observation, the equation is:
+$$ residual =  \left(H_{to} - H_{from}\right) - l$$
+
+To convert the points RTL coordinates into ellipsoid heights,
+the fist step is to convert them to geocentric ($X$, $Y$, $Z$) and then use the formula from
+\textit{Bowring, 1985, The accuracy of geodetic latitude and height equations}
+\url{geodesie.ign.fr/contenu/fichiers/documentation/pedagogiques/TransformationsCoordonneesGeodesiques.pdf}
+
+
+###
+
+\begin{figure}[!h]
+\centering
+\includegraphics[width=11cm]{img/GeoCtoGeoG.png}
+\end{figure}
+
+
+Where $a$ and $e$ are constants from the ellipsoid.
+
 
 # Links
 ### Links
