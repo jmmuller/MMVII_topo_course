@@ -1392,8 +1392,11 @@ It is recorded in \texttt{cTopoObsSetStation} as:
 \begin{scriptsize}
 \begin{verbatim}
 tRot mRotSysCo2Vert; //rotation between global SysCo and vertical frame
+
 tRot mRotVert2Instr; //current value rotation from vert to instr frame
-cPt3dr_UK mRotOmega; //mRotVert2Instr unknown
+
+std::vector<tREAL8> mParams;
+    // mRotVert2Instr unknown is recorded as mParams[0..2]
 \end{verbatim}
 \end{scriptsize}
 
@@ -1401,9 +1404,9 @@ cPt3dr_UK mRotOmega; //mRotVert2Instr unknown
 
 The possible orientation constraints are:
 \begin{itemize}
-   \item \texttt{\#FIX}: \texttt{mRotOmega} is fixed for $x$, $y$ and $z$
-   \item \texttt{\#VERT}: \texttt{mRotOmega} is fixed for $x$ and $y$
-   \item \texttt{\#BASC}: \texttt{mRotOmega} has no fixed component
+   \item \texttt{\#FIX}: \texttt{mParams} is fixed for $x$, $y$ and $z$
+   \item \texttt{\#VERT}: \texttt{mParams} is fixed for $x$ and $y$
+   \item \texttt{\#BASC}: \texttt{mParams} has no fixed component
 \end{itemize}
 
 ###
@@ -1492,6 +1495,37 @@ public :
 \end{scriptsize}
 
 
+### {.fragile}
+
+\begin{scriptsize}
+\begin{verbatim}
+template <Type> Type DiffAngMod(const Type & aA, const Type & aB)
+{
+     auto aDiff = aA - aB;
+     if (std::isfinite(aDiff))
+     {
+         if (aDiff < -M_PI)
+         {   int n = (aDiff-M_PI)/(-2*M_PI);
+             aDiff += n*2*M_PI;  }
+         if (aDiff > 2*M_PI)
+         {   int n = aDiff/(2*M_PI);
+             aDiff -= n*2*M_PI;  }
+     }
+     return aDiff;
+}
+
+template <Type> Type DerA_DiffAngMod(const Type & aA,const Type & aB)
+{     return 1.;     }
+
+template <Type> Type DerB_DiffAngMod(const Type & aA,const Type & aB)
+{     return -1.;    }
+
+
+MACRO_SD_DEFINE_STD_BINARY_FUNC_OP_DERIVABLE( MMVII,
+        DiffAngMod, DerA_DiffAngMod, DerB_DiffAngMod )
+\end{verbatim}
+\end{scriptsize}
+
 ## Least squares
 ### Least squares
 
@@ -1529,31 +1563,32 @@ std::map<eTopoObsType, cCalculator<double>*> mTopoObsType2equation =
 \end{scriptsize}
 
 ### {.fragile}
-Unknowns specific to topo are only \textbf{cTopoObsSet} parameters
-(instruments rotation for now):
+Unknowns specific to topo are only \textbf{cTopoObsSet::mParams}
+(= rotation unknowns for stations):
 
 \begin{scriptsize}
 \begin{verbatim}
-void cBA_Topo::AddToSys(cSetInterUK_MultipeObj<tREAL8> & aSet)
-{;
+void cBA_Topo::AddToSys(cSetInterUK_MultipeObj<tREAL8> & aSetInterUK)
+{
     for (auto& anObsSet: mAllObsSets)
-        anObsSet->AddToSys(aSet);
+        aSetInterUK.AddOneObj(anObsSet);
 }
 
-void cTopoObsSetStation::AddToSys(cSetInterUK_MultipeObj<tREAL8> & aSet)
+void cTopoObsSet::PutUknowsInSetInterval()
 {
-    cTopoObsSet::AddToSys(aSet);
-    aSet.AddOneObj(&mRotOmega);
-    aSet.AddOneObj(this); // to have OnUpdate called on SetVUnKnowns
+    if (!mParams.empty())
+        mSetInterv->AddOneInterv(mParams);
 }
 
 void cTopoObsSetStation::OnUpdate()
 {
-    mRotOmega.Pt() = mRotVert2Instr.Inverse(mRotOmega.Pt()); // ???
+    auto aRotOmega = getRotOmega();
+    aRotOmega = mRotVert2Instr.Inverse(aRotOmega); //see cPoseF comments
     mRotVert2Instr = mRotVert2Instr *
-            cRotation3D<tREAL8>::RotFromAxiator(mRotOmega.Pt());
-    updateVertMat(); // update mRotSysCo2Vert with new st pos
-    mRotOmega.Pt() = cPt3dr(0,0,0); // void delta after modif
+        cRotation3D<tREAL8>::RotFromAxiator(aRotOmega);
+    updateVertMat(); // update mRotSysCo2Vert with new station position
+    // now this have modified rotation, the "delta" is void:
+    resetRotOmega();
 }
 \end{verbatim}
 \end{scriptsize}
@@ -1595,7 +1630,7 @@ std::vector<int> cTopoObs::getIndices() const
     
     set->getPtOrigin()->getUK()->PushIndexes(indices);
     
-    set->getRotOmega().PushIndexes(indices);
+    set->PushIndexes(indices, set->mParams.data(), 3);
     
     cObjWithUnkowns<tREAL8>* toUk =
         mBA_Topo->getPoint(mPtsNames[1]).getUK();
@@ -1605,7 +1640,7 @@ std::vector<int> cTopoObs::getIndices() const
     break;
   }
   ...
-return indices;
+  return indices;
 }
 \end{verbatim}
 \end{scriptsize}
