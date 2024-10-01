@@ -1216,7 +1216,7 @@ class cDist3D
   public :
     cDist3D() {}
     static const std::vector<std::string> VNamesUnknowns() {
-        return Append(NamesP3("p1"), NamesP3("p2"));
+        return {"p1_x","p1_y","p1_z", "p2_x","p2_y","p2_z"};
     }
     static const std::vector<std::string> VNamesObs() { return {"D"}; }
     std::string FormulaName() const { return "Dist3D"; }
